@@ -238,4 +238,4 @@ node scripts/verify.mjs https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev --live
 
 ---
 
-Copyright © 2026 baize7815. Original code and Skill in this project are licensed under https://github.com/baize7815/jev-mcp-open-source/blob/main/LICENSE ; dependencies and references are listed in https://github.com/baize7815/jev-mcp-open-source/blob/main/THIRD_PARTY_NOTICES.md .
+Copyright © 2026 **baize7815**. Original code and Skill in this project are licensed under the [MIT License](https://github.com/baize7815/jev-mcp-open-source/blob/main/LICENSE); dependencies and references are listed in the [third-party notices](https://github.com/baize7815/jev-mcp-open-source/blob/main/THIRD_PARTY_NOTICES.md).

@@ -238,4 +238,4 @@ node scripts/verify.mjs https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev --live
 
 ---
 
-Copyright © 2026 baize7815。本项目原创代码与 Skill 采用 https://github.com/baize7815/jev-mcp-open-source/blob/main/LICENSE 许可证；依赖和参考项目见 https://github.com/baize7815/jev-mcp-open-source/blob/main/THIRD_PARTY_NOTICES.md 。
+Copyright © 2026 **baize7815**。本项目原创代码与 Skill 采用 [MIT](https://github.com/baize7815/jev-mcp-open-source/blob/main/LICENSE) 许可证；依赖和参考项目见 [第三方声明](https://github.com/baize7815/jev-mcp-open-source/blob/main/THIRD_PARTY_NOTICES.md)。
