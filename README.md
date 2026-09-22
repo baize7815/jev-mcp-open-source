@@ -2,8 +2,6 @@
 
 自部署的 Jev MCP 与配套 Codex Skill。支持用户意图路由、文件/知识库检索结果重排、批量语义判断，以及通用的 TypeSafe System One 调用。
 
-Copyright © 2026 **baize7815**。本项目原创代码与 Skill 采用 [MIT](LICENSE) 许可证；依赖和参考项目见 [第三方声明](THIRD_PARTY_NOTICES.md)。
-
 ## 包含什么
 
 - Cloudflare Worker：`src/`。
@@ -113,3 +111,7 @@ node scripts/verify.mjs http://127.0.0.1:8791
 ## 上传 GitHub
 
 仅提交源文件与配置模板。不要强制添加被 `.gitignore` 排除的真实配置、环境文件、运行缓存、数据库、依赖或日志。仓库不需要包含任何 Cloudflare OAuth token、部署地址或 API Key；每位使用者在自己的环境完成授权和配置。
+
+---
+
+Copyright © 2026 baize7815。本项目原创代码与 Skill 采用 https://github.com/baize7815/jev-mcp-open-source/blob/main/LICENSE 许可证；依赖和参考项目见 https://github.com/baize7815/jev-mcp-open-source/blob/main/THIRD_PARTY_NOTICES.md 。
