@@ -22,7 +22,11 @@ export async function rpc(url, method, params, id, session) {
 async function main() {
   const args = process.argv.slice(2);
   const describe = args[0] === '--describe';
-  if (!describe && (!['route_intent', 'rerank_candidates', 'batch_judge', 'system_one'].includes(args[0]) || args[1] !== '--input' || !args[2] || args.length !== 3)) {
+  const tools = [
+    'route_intent', 'rerank_candidates', 'batch_judge', 'select_values', 'verify_evidence',
+    'evaluate_options', 'classify_hierarchy', 'decide_next_step', 'system_one',
+  ];
+  if (!describe && (!tools.includes(args[0]) || args[1] !== '--input' || !args[2] || args.length !== 3)) {
     throw new Error('Usage: node call-mcp.mjs --describe | <tool> --input <JSON file>');
   }
   let input;
@@ -34,13 +38,15 @@ async function main() {
   if (!url) throw new Error('Set JEV_MCP_URL to your own deployed MCP endpoint before calling.');
   const endpoint = new URL(url);
   if (!['https:', 'http:'].includes(endpoint.protocol) || endpoint.username || endpoint.password) throw new Error('JEV_MCP_URL must be an HTTP(S) URL without embedded credentials.');
-  const init = await rpc(url, 'initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'jev-workflows', version: '0.2.0' } }, 1);
+  const init = await rpc(url, 'initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'jev-workflows', version: '0.3.0' } }, 1);
   const listed = await rpc(url, 'tools/list', {}, 2, init.session);
   if (describe) {
     console.log(JSON.stringify({ server: init.result.serverInfo, instructions: init.result.instructions, tools: listed.result.tools }, null, 2));
     return;
   }
-  if (!listed.result.tools.some(tool => tool.name === args[0])) throw new Error('Requested tool is not deployed on this MCP.');
+  if (!listed.result.tools.some(tool => tool.name === args[0])) {
+    throw new Error(`Requested tool is not deployed on this MCP. Server version: ${init.result.serverInfo?.version ?? 'unknown'}. Run --describe and refresh/reconnect the client after deploying the current server.`);
+  }
   const called = await rpc(url, 'tools/call', { name: args[0], arguments: input }, 3, listed.session);
   if (called.result.isError) throw new Error(called.result.content?.find(block => block.type === 'text')?.text ?? 'Tool failed');
   for (const block of called.result.content ?? []) if (block.type === 'text') console.log(block.text);

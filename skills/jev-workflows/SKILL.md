@@ -1,7 +1,7 @@
 ---
 name: jev-workflows
 license: MIT
-description: 主动用 Jev 辅助用户意图与上下文承接判断、工具或知识源选择，以及本地文件搜索和知识库检索后的语义相关性排序、批量分类筛选。适用于需要解释有歧义的请求、从多个处理路径中选择，或从多条候选资料中判断该读哪些的任务；用户无需提及 Jev。不用于闲聊、明确的单步指令或精确文件名查找。
+description: 主动用 Jev 作为通用语义判断层：处理意图与上下文承接、工具或知识源选择、检索重排、批量分类、候选值提取、声明与证据核验、多标准方案比较、层级分类和变化状态下的下一步选择。适用于普通代码无法可靠完成、但又不需要生成长文本的语义判断；用户无需提及 Jev。不用于闲聊、纯计算、明确单步命令、精确查找或实际执行动作。
 ---
 
 # Jev 工作流
@@ -34,19 +34,36 @@ description: 主动用 Jev 辅助用户意图与上下文承接判断、工具�
 
 Choice 使用明确的命名选项；Noul 判断条件是否成立；Score 使用 2–10 个有具体含义的有序等级。独立问题可共享同一条 state。使用代码做排序、计数、阈值和权重计算。低置信度不是自动通过或自动拒绝；根据任务复核。
 
+## 结构化提取与参数填充
+
+当目标字段只能从一组已知候选值中选择时使用 `select_values`，例如实体消歧、表单字段恢复、工具参数填充和从用户文本中选择已有配置。先由普通代码准备完整候选集，再把共享 state、字段说明和候选 ID 交给 Jev；返回的是候选 ID，不是自由生成的新值。`needs_review` 或 `__none__` 说明证据不足，不能为了凑参数擅自填值。
+
+## 证据核验
+
+已经有 claim 和 evidence 时使用 `verify_evidence` 判断 supplied evidence 是支持、矛盾还是不足。它不会搜索外部资料，也不能把“证据支持”偷换成“世界上绝对为真”；研究、RAG、代码/需求检查仍应读取原始证据。失败项保持未判断，不把服务失败解释成 `insufficient`。
+
+## 多方案与层级分类
+
+多个方案需要按多个明确标准比较时使用 `evaluate_options`。每个标准的 Score 等级要从差到好定义，权重由调用者给出；Jev 负责语义评分，最终加权由代码完成，因此只改权重且事实未变时不必重新推理。大类目或树状 taxonomy 使用 `classify_hierarchy`，逐层选择并在不匹配或低置信度时停止，不把几百个类别硬塞成一个 Choice。
+
+## 变化状态下的下一步
+
+目标、当前观察和允许动作都已知，但下一步取决于语义判断时使用 `decide_next_step`。它返回建议动作和 `input_fingerprint`；只有 goal、observations、context、actions 都未变化时才复用旧结果。这个工具只做选择，不执行动作，也不产生授权；涉及修改、发送、发布、删除等动作仍按宿主和用户授权规则处理。
+
 ## 工具入口与旧连接
 
-优先使用已连接的 Jev 服务所提供的 `route_intent`、`rerank_candidates`、`batch_judge`，保留 `system_one` 用于自定义单条判断。工具名称以客户端实际暴露的名称为准。
+优先使用已连接的 Jev 服务所提供的专用跨领域工作流：`route_intent`、`rerank_candidates`、`batch_judge`、`select_values`、`verify_evidence`、`evaluate_options`、`classify_hierarchy`、`decide_next_step`；只有没有匹配工作流时才用 `system_one` 自定义 Noul/Choice/Score。工具名称以客户端实际暴露的名称为准。
 
 如果连接缓存里只有旧 `system_one`，不要编造不存在的工具名。可用本 Skill 的 `scripts/call-mcp.mjs` 直接访问同一服务，直到客户端刷新：
 
 ```powershell
 node <本Skill目录>/scripts/call-mcp.mjs --describe
 node <本Skill目录>/scripts/call-mcp.mjs rerank_candidates --input <候选JSON文件>
+node <本Skill目录>/scripts/call-mcp.mjs verify_evidence --input <声明证据JSON文件>
 ```
 
 使用前由使用者通过环境变量 `JEV_MCP_URL` 配置自己的 MCP 地址；脚本不包含默认远程地址，未配置时会停止且不会联网。通过初始化和工具列表核对后只调用一次，不自动重试。TypeSafe API Key 仅由部署者在服务器管理。仅传递任务所需、允许发给该服务的内容，不传凭据或整段无关对话。
 
 批量原文尽量由代码读取并组装 JSON 文件，避免将整批原文先打印进助手上下文。查看返回的 ID、计数与需复核条目即可；需要引用时再读取相关原文。
 
-这是主动选择工具的工作流指导，不是拦截每轮消息的 Hook。若工具不可用且 HTTP 备用方式也失败，说明一次并继续独立可完成的工作。
+这是主动选择工具的工作流指导，不是拦截每轮消息的 Hook。确定性代码、精确匹配、算术和已经明确的执行路径不要绕去问 Jev。若工具不可用且 HTTP 备用方式也失败，说明一次并继续独立可完成的工作。

@@ -1,6 +1,6 @@
 {
   "name": "jev-mcp-worker",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Self-hosted Jev MCP on Cloudflare Workers with intent routing, retrieval reranking and batch judgments",
   "author": "baize7815",
@@ -12,6 +12,8 @@
     "types": "wrangler types",
     "typecheck": "tsc --noEmit",
     "privacy:check": "node scripts/check-privacy.mjs",
+    "eval:check": "node --experimental-strip-types scripts/eval.mjs --check",
+    "eval:live": "node --experimental-strip-types scripts/eval.mjs --live",
     "test": "node --experimental-strip-types --test test/*.test.ts test/*.test.mjs",
     "deploy:check": "wrangler deploy --dry-run",
     "predeploy": "node scripts/check-config.mjs",

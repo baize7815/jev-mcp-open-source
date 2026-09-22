@@ -1,0 +1,196 @@
+[
+  {
+    "id": "route-review-not-edit",
+    "tool": "route_intent",
+    "input": {
+      "request": "先检查原因，不要改代码",
+      "context": "正在处理一个登录故障。",
+      "routes": [
+        { "id": "review", "description": "Inspect and diagnose without editing" },
+        { "id": "implement", "description": "Modify code to fix the issue" }
+      ]
+    },
+    "expect": [{ "path": "route", "equals": "review" }],
+    "calibration": { "decision_path": "suggested_route", "confidence_path": "confidence", "expected": "review" }
+  },
+  {
+    "id": "route-ambiguous-reference",
+    "tool": "route_intent",
+    "input": {
+      "request": "把那个处理一下",
+      "context": "当前同时有报告 A 和报告 B，用户没有说明指哪一个。",
+      "routes": [
+        { "id": "report_a", "description": "Process report A" },
+        { "id": "report_b", "description": "Process report B" }
+      ]
+    },
+    "expect": [{ "path": "status", "equals": "needs_review" }, { "path": "route", "equals": null }]
+  },
+  {
+    "id": "rerank-worker-domain",
+    "tool": "rerank_candidates",
+    "input": {
+      "query": "如何给 Cloudflare Worker 绑定自定义域名？",
+      "top_k": 2,
+      "candidates": [
+        { "id": "food", "text": "意面煮熟后加入番茄酱。" },
+        { "id": "worker", "text": "在 Worker 的 Settings 中打开 Domains & Routes，添加 Custom Domain 并确认域名。" },
+        { "id": "lighting", "text": "人像摄影可以使用柔光箱。" }
+      ]
+    },
+    "expect": [{ "path": "ranked.0.id", "equals": "worker" }]
+  },
+  {
+    "id": "batch-billing",
+    "tool": "batch_judge",
+    "input": {
+      "items": [
+        { "id": "billing", "state": "I was charged twice for the same order." },
+        { "id": "bug", "state": "The app crashes when opening settings." }
+      ],
+      "questions": {
+        "category": {
+          "type": "choice",
+          "instructions": "Which team should handle this report?",
+          "criteria": { "billing": "Payments and charges", "technical": "Software bugs and crashes" }
+        }
+      }
+    },
+    "expect": [
+      { "path": "results.0.answers.category.choice", "equals": "billing" },
+      { "path": "results.1.answers.category.choice", "equals": "technical" }
+    ]
+  },
+  {
+    "id": "select-home-address",
+    "tool": "select_values",
+    "input": {
+      "state": "Use my saved home address for this delivery.",
+      "fields": [{
+        "id": "address",
+        "instructions": "Which saved address did the user request?",
+        "candidates": [
+          { "id": "home", "description": "Home address" },
+          { "id": "office", "description": "Office address" }
+        ]
+      }]
+    },
+    "expect": [{ "path": "results.0.suggested_value", "equals": "home" }],
+    "calibration": { "decision_path": "results.0.suggested_value", "confidence_path": "results.0.confidence", "expected": "home" }
+  },
+  {
+    "id": "select-no-carrier",
+    "tool": "select_values",
+    "input": {
+      "state": "Please ship the order quickly. No carrier was named.",
+      "fields": [{
+        "id": "carrier",
+        "instructions": "Which carrier did the user explicitly choose?",
+        "candidates": [
+          { "id": "a", "description": "Carrier A" },
+          { "id": "b", "description": "Carrier B" }
+        ]
+      }]
+    },
+    "expect": [{ "path": "results.0.status", "equals": "needs_review" }, { "path": "results.0.suggested_value", "equals": null }]
+  },
+  {
+    "id": "verify-build-supported",
+    "tool": "verify_evidence",
+    "input": {
+      "claims": [{
+        "id": "build",
+        "claim": "The build passed.",
+        "evidence": [{ "id": "log", "text": "Build completed successfully with exit code 0." }]
+      }]
+    },
+    "expect": [{ "path": "results.0.verdict", "equals": "supported" }],
+    "calibration": { "decision_path": "results.0.verdict", "confidence_path": "results.0.confidence", "expected": "supported" }
+  },
+  {
+    "id": "verify-insufficient",
+    "tool": "verify_evidence",
+    "input": {
+      "claims": [{
+        "id": "tests",
+        "claim": "All tests passed.",
+        "evidence": [{ "id": "log", "text": "The package installation completed. No test results are shown." }]
+      }]
+    },
+    "expect": [{ "path": "results.0.verdict", "equals": "insufficient" }],
+    "calibration": { "decision_path": "results.0.verdict", "confidence_path": "results.0.confidence", "expected": "insufficient" }
+  },
+  {
+    "id": "evaluate-clear-option",
+    "tool": "evaluate_options",
+    "input": {
+      "options": [
+        { "id": "a", "state": "Meets every required feature and ships today." },
+        { "id": "b", "state": "Misses a required feature and ships next week." }
+      ],
+      "criteria": [
+        { "id": "requirements", "instructions": "How completely does the option satisfy required features?", "levels": ["poor", "partial", "complete"], "weight": 3 },
+        { "id": "speed", "instructions": "How favorable is the delivery time?", "levels": ["slow", "acceptable", "fast"], "weight": 1 }
+      ]
+    },
+    "expect": [{ "path": "ranked.0.id", "equals": "a" }]
+  },
+  {
+    "id": "hierarchy-duplicate-charge",
+    "tool": "classify_hierarchy",
+    "input": {
+      "state": "I was charged twice for the same order.",
+      "categories": [
+        {
+          "id": "billing",
+          "description": "Payments and charges",
+          "children": [
+            { "id": "duplicate", "description": "Duplicate charge" },
+            { "id": "refund", "description": "Refund status" }
+          ]
+        },
+        { "id": "technical", "description": "Software failures" }
+      ]
+    },
+    "expect": [{ "path": "category", "equals": "duplicate" }]
+  },
+  {
+    "id": "hierarchy-no-fit",
+    "tool": "classify_hierarchy",
+    "input": {
+      "state": "The user asks about office opening hours.",
+      "categories": [
+        { "id": "billing", "description": "Payments and charges" },
+        { "id": "technical", "description": "Software failures" }
+      ]
+    },
+    "expect": [{ "path": "status", "equals": "needs_review" }, { "path": "category", "equals": null }]
+  },
+  {
+    "id": "next-step-inspect-error",
+    "tool": "decide_next_step",
+    "input": {
+      "goal": "Fix the failing build",
+      "observations": "The compiler reports a missing import. Tests have not run.",
+      "actions": [
+        { "id": "inspect", "description": "Inspect the compiler error and missing import" },
+        { "id": "deploy", "description": "Deploy the current build", "preconditions": "The build succeeds" }
+      ]
+    },
+    "expect": [{ "path": "suggested_action", "equals": "inspect" }],
+    "calibration": { "decision_path": "suggested_action", "confidence_path": "confidence", "expected": "inspect" }
+  },
+  {
+    "id": "next-step-no-justified-action",
+    "tool": "decide_next_step",
+    "input": {
+      "goal": "Publish a verified release",
+      "observations": "No build or test result is available yet.",
+      "actions": [
+        { "id": "deploy", "description": "Deploy the release", "preconditions": "Build and tests pass" },
+        { "id": "announce", "description": "Announce the release", "preconditions": "Deployment succeeds" }
+      ]
+    },
+    "expect": [{ "path": "status", "equals": "needs_review" }, { "path": "action", "equals": null }]
+  }
+]

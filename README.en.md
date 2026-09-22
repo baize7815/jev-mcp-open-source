@@ -2,7 +2,7 @@
 
 English | [中文](README.md)
 
-A self-hosted MCP gateway that runs on Cloudflare Workers and wraps the TypeSafe / Jev System One model as four tools. It is designed for AI assistants that need to make **intent routing, retrieval reranking, and batch semantic judgments** — decisions that call for a structured answer, not long prose. A companion Codex Skill tells the assistant when to call each tool.
+A self-hosted MCP gateway that runs on Cloudflare Workers and wraps the TypeSafe / Jev System One model as nine tools. It is designed for AI assistants that need to make **intent routing, retrieval reranking, and batch semantic judgments** — decisions that call for a structured answer, not long prose. A companion Codex Skill tells the assistant when to call each tool.
 
 - **Backend**: Cloudflare Workers + D1 (SQLite)
 - **Upstream model**: TypeSafe System One (`jev-latest`)
@@ -11,16 +11,27 @@ A self-hosted MCP gateway that runs on Cloudflare Workers and wraps the TypeSafe
 
 ## Tools
 
-Once deployed, `/mcp` exposes the following four tools. Every call returns a structured answer with confidence — no prose generation. The server validates batch size, enforces concurrency, and isolates per-item failures.
+Once deployed, `/mcp` exposes the following nine tools. Every call returns a structured answer with confidence — no prose generation. The server validates batch size, enforces concurrency, and isolates per-item failures.
 
 | Tool | Purpose | Typical use |
 | --- | --- | --- |
 | `route_intent` | Choose among candidate routes / tools / knowledge sources, with confidence | "Tidy that one up" — decide which file, which retrieval path, or whether to answer directly |
 | `rerank_candidates` | Score retrieved excerpts by semantic relevance and rank them | A local or knowledge-base search returns 10 results; pick which originals to read |
 | `batch_judge` | Apply the same set of questions to many records in one call | Triage tickets, tag documents, filter candidate files |
+| `select_values` | Select field values from known candidates | Entity resolution, structured extraction and argument filling |
+| `verify_evidence` | Check whether supplied evidence supports or contradicts a claim, or is insufficient | RAG, research and requirement checks; no retrieval |
+| `evaluate_options` | Score explicit criteria and apply weights in code | Compare options while retaining raw scores for reweighting |
+| `classify_hierarchy` | Walk a taxonomy and stop on uncertainty | Large or hierarchical category sets |
+| `decide_next_step` | Suggest an action from the current goal and observations | Returns an input fingerprint; never executes actions |
 | `system_one` | Raw pass-through to TypeSafe System One with custom state and questions | Custom boolean / choice / scoring judgments not covered by the tools above |
 
-Universal limits: at most **10** records per batch, **128 KB** total input, server-side concurrency **3**. Failed items in a batch are marked `failed` — they mean "not judged", not "irrelevant". Failed calls are never retried automatically to avoid double billing.
+Batch-record limits: at most **10** records per batch, **128 KB** total input, server-side concurrency **3**. Failed items in a batch are marked `failed` — they mean "not judged", not "irrelevant". Failed calls are never retried automatically to avoid double billing.
+
+## 0.3.0 and validation
+
+This version exposes nine tools, preserves the existing database and interfaces, and requires no new database migration. Reconnect the client to refresh its tool list. See `eval/cases.json` for complete workflow inputs covering successful and uncertain decisions.
+
+`npm run eval:check` validates the format of 13 synthetic evaluation cases only. `npm run eval:live` requires an explicit `JEV_MCP_URL` and spends quota through that endpoint's real `system_one`, reporting exact-match results and confidence-threshold statistics. It is not a domain-accuracy guarantee.
 
 ## How it works
 
@@ -166,7 +177,7 @@ Question types:
 
 ### `system_one`
 
-For custom judgments beyond the three tools above, pass `state` and `questions` directly:
+For custom judgments not covered by the specialized workflows, pass `state` and `questions` directly:
 
 ```json
 {
@@ -191,11 +202,12 @@ The admin API compares the token with a constant-time SHA-256 check, the console
 
 Copy the entire `skills/jev-workflows/` directory into your Codex personal skills folder (typically `~/.codex/skills/`), connect your deployed MCP, and refresh the tool list.
 
-The Skill calls Jev proactively at three decision points rather than intercepting every message:
+The Skill calls Jev proactively at the following decision points rather than intercepting every message:
 
 1. When intent is ambiguous, depends on prior context, or needs a choice among tools / knowledge sources.
 2. After file or knowledge-base retrieval returns multiple candidates that need relevance ranking before reading originals.
 3. When the same set of questions must be applied to many records for classification or filtering.
+4. For candidate-backed extraction, evidence verification, multi-criterion comparison, hierarchical classification or state-dependent next-step selection.
 
 If your MCP client only cached the legacy `system_one`, use the bundled fallback script:
 
@@ -225,7 +237,7 @@ node scripts/verify.mjs https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev --live
 
 ## Limits
 
-- At most 10 records per batch, 128 KB total input, server-side concurrency 3.
+- Batch-record tools accept up to 10 records, 128 KB total input and concurrency 3; extraction accepts up to 20 fields. See each tool's input schema for its other limits.
 - Failed requests are not retried; `usage_complete: false` means the summary does not cover potential spend on failed items.
 - The intent confidence threshold (default 0.65) is a heuristic review line, not a correctness guarantee or user authorization.
 - Scores and route suggestions are relative signals; the assistant should still read the originals before answering.

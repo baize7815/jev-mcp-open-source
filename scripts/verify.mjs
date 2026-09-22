@@ -6,12 +6,15 @@ const base = process.argv[2] ?? 'http://127.0.0.1:8791';
 const live = process.argv.includes('--live');
 const url = `${base}/mcp`;
 let id = 0;
-const init = await rpc(url, 'initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'jev-verification', version: '0.2.0' } }, ++id);
-assert.equal(init.result.serverInfo.version, '0.2.0');
+const init = await rpc(url, 'initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'jev-verification', version: '0.3.0' } }, ++id);
+assert.equal(init.result.serverInfo.version, '0.3.0');
 assert.ok(init.result.instructions.includes('rerank_candidates'));
 const listed = await rpc(url, 'tools/list', {}, ++id, init.session);
-assert.deepEqual(listed.result.tools.map(tool => tool.name).sort(), ['batch_judge', 'rerank_candidates', 'route_intent', 'system_one']);
-console.log('PASS initialize instructions and four advertised tools');
+assert.deepEqual(listed.result.tools.map(tool => tool.name).sort(), [
+  'batch_judge', 'classify_hierarchy', 'decide_next_step', 'evaluate_options', 'rerank_candidates',
+  'route_intent', 'select_values', 'system_one', 'verify_evidence',
+]);
+console.log('PASS initialize instructions, version and nine advertised tools');
 
 for (const path of ['/admin', '/admin/style.css', '/admin/app.js']) {
   const expected = await handleAdmin(new Request(`${base}${path}`), {});
@@ -63,7 +66,30 @@ if (live) {
   assert.equal(batch.status, 'ok');
   assert.equal(batch.results[0].answers.category.choice, 'billing');
   assert.equal(batch.results[1].answers.category.choice, 'technical');
+  const selected = await call('select_values', { state: 'Use the saved home address.', fields: [{
+    id: 'address', instructions: 'Which saved address is requested?', candidates: [{ id: 'home', description: 'Home address' }, { id: 'office', description: 'Office address' }],
+  }] });
+  assert.equal(selected.results[0].suggested_value, 'home');
+  const verified = await call('verify_evidence', { claims: [{
+    id: 'build', claim: 'The build passed.', evidence: [{ id: 'log', text: 'Build completed successfully with exit code 0.' }],
+  }] });
+  assert.equal(verified.results[0].verdict, 'supported');
+  const compared = await call('evaluate_options', {
+    options: [{ id: 'a', state: 'Meets every required feature and ships today.' }, { id: 'b', state: 'Misses a required feature and ships next week.' }],
+    criteria: [{ id: 'fit', instructions: 'How well does the option satisfy the stated requirements?', levels: ['poor', 'partial', 'complete'], weight: 1 }],
+  });
+  assert.equal(compared.ranked[0].id, 'a');
+  const classified = await call('classify_hierarchy', { state: 'I was charged twice for the same order.', categories: [
+    { id: 'billing', description: 'Payments and charges', children: [{ id: 'duplicate', description: 'Duplicate charge' }, { id: 'refund', description: 'Refund status' }] },
+    { id: 'technical', description: 'Software failures' },
+  ] });
+  assert.equal(classified.category, 'duplicate');
+  const next = await call('decide_next_step', {
+    goal: 'Fix the build', observations: 'Compiler reports a missing import.',
+    actions: [{ id: 'inspect', description: 'Inspect the compiler error and missing import' }, { id: 'deploy', description: 'Deploy the current build', preconditions: 'Build succeeds' }],
+  });
+  assert.equal(next.suggested_action, 'inspect');
   const original = await call('system_one', { state: 'The parcel has been delivered.', questions: { delivered: { type: 'noul', instructions: 'Has the parcel been delivered?' } } });
   assert.ok(original.answers.delivered.noul > 0.5);
-  console.log('PASS live intent/context/ambiguity, relevance ranking, batch classification and legacy tool');
+  console.log('PASS live routing, reranking, batch, extraction, verification, option evaluation, hierarchy, next-step and legacy tool');
 }

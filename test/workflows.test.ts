@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { batchJudge, rerankCandidates, routeIntent, type Judge } from '../src/workflows.ts';
+import {
+  batchJudge, classifyHierarchy, decideNextStep, evaluateOptions, rerankCandidates, routeIntent, selectValues,
+  verifyEvidence, type Judge,
+} from '../src/workflows.ts';
 
 const choice = (selected: string, confidence = 0.9) => ({ choice: selected, confidence, probabilities: { [selected]: 1 } });
 const usage = { input_tokens: 12, output_tokens: 3 };
@@ -102,4 +105,103 @@ test('a missing batch answer is a failure, not a successful empty judgment', asy
   const result = await batchJudge({ items: [{ id: 'a', state: 'x' }], questions: qs }, async () => ({ answers: {} }));
   assert.equal(result.failed, 1);
   assert.equal(result.status, 'unavailable');
+});
+
+test('select_values keeps candidate IDs bounded and exposes review instead of forcing a field', async () => {
+  const result = await selectValues({
+    state: { message: 'Ship to the home address and use express delivery.' },
+    fields: [
+      { id: 'address', instructions: 'Which saved address did the user choose?', candidates: [
+        { id: 'home', description: 'Home address' }, { id: 'office', description: 'Office address' },
+      ] },
+      { id: 'carrier', instructions: 'Which carrier did the user explicitly choose?', candidates: [
+        { id: 'a', description: 'Carrier A' }, { id: 'b', description: 'Carrier B' },
+      ] },
+    ],
+  }, async request => {
+    assert.deepEqual(Object.keys(request.questions), ['address', 'carrier']);
+    return { answers: { address: choice('home'), carrier: choice('__none__', 0.95) }, usage };
+  });
+  assert.equal(result.status, 'needs_review');
+  assert.equal(result.results[0].value, 'home');
+  assert.equal(result.results[1].value, null);
+  assert.equal(result.results[1].suggested_value, null);
+});
+
+test('verify_evidence isolates failed claims and never turns failure into insufficient', async () => {
+  const result = await verifyEvidence({ claims: [
+    { id: 'supported', claim: 'The build passed.', evidence: [{ id: 'log', text: 'Build completed successfully.' }] },
+    { id: 'failed', claim: 'Tests passed.', evidence: [{ id: 'log', text: 'No test output available.' }] },
+  ] }, async request => {
+    const state = request.state as { claim: string };
+    if (state.claim.startsWith('Tests')) throw new Error('offline');
+    return { answers: { verdict: choice('supported') }, usage };
+  });
+  assert.equal(result.status, 'partial');
+  assert.equal(result.results[0].verdict, 'supported');
+  assert.equal(result.results[1].status, 'failed');
+  assert.equal(result.results[1].verdict, null);
+});
+
+test('evaluate_options applies weights in code and preserves raw criterion judgments', async () => {
+  const result = await evaluateOptions({
+    options: [{ id: 'fast', state: { speed: 'high', quality: 'medium' } }, { id: 'careful', state: { speed: 'medium', quality: 'high' } }],
+    criteria: [
+      { id: 'speed', instructions: 'Rate speed.', levels: ['slow', 'medium', 'fast'], weight: 1 },
+      { id: 'quality', instructions: 'Rate quality.', levels: ['low', 'medium', 'high'], weight: 3 },
+    ],
+  }, async request => {
+    const state = request.state as { option: { speed: string } };
+    return { answers: {
+      speed: { score: state.option.speed === 'high' ? 2 : 1, confidence: 0.9 },
+      quality: { score: state.option.speed === 'high' ? 1 : 2, confidence: 0.9 },
+    }, usage };
+  });
+  assert.equal(result.status, 'ok');
+  assert.deepEqual(result.ranked.map(row => row.id), ['careful', 'fast']);
+  assert.equal(result.ranked[0].judgments.length, 2);
+});
+
+test('classify_hierarchy walks levels and stops before forcing an uncertain child', async () => {
+  let calls = 0;
+  const result = await classifyHierarchy({
+    state: 'The report concerns a login crash.',
+    categories: [
+      { id: 'technical', description: 'Software problems', children: [
+        { id: 'auth', description: 'Authentication problems' },
+        { id: 'rendering', description: 'Rendering problems' },
+      ] },
+      { id: 'billing', description: 'Payments' },
+    ],
+  }, async () => {
+    calls++;
+    return calls === 1
+      ? { answers: { category: choice('technical') }, usage }
+      : { answers: { category: choice('auth', 0.4) }, usage };
+  });
+  assert.equal(result.status, 'needs_review');
+  assert.deepEqual(result.path.map(row => row.id), ['technical']);
+  assert.equal(result.suggested_category, 'auth');
+  assert.equal(calls, 2);
+});
+
+test('decide_next_step returns a stable fingerprint for identical decision inputs and never executes', async () => {
+  const input = {
+    goal: 'Fix the failing build',
+    observations: { compile: 'failed', tests: 'not run' },
+    actions: [
+      { id: 'inspect_error', description: 'Read the compiler error' },
+      { id: 'run_tests', description: 'Run the test suite', preconditions: 'Compilation succeeds' },
+    ],
+  };
+  const judge: Judge = async request => {
+    assert.ok((request.questions.next_action.instructions as string).includes('never authorizes execution'));
+    return { answers: { next_action: choice('inspect_error') }, usage };
+  };
+  const first = await decideNextStep(input, judge);
+  const second = await decideNextStep(input, judge);
+  assert.equal(first.status, 'resolved');
+  assert.equal(first.action, 'inspect_error');
+  assert.equal(first.input_fingerprint, second.input_fingerprint);
+  assert.equal(first.input_fingerprint.length, 64);
 });
