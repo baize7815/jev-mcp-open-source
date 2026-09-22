@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS api_keys (
+  id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  ciphertext TEXT NOT NULL,
+  nonce TEXT NOT NULL,
+  hint TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+  calls INTEGER NOT NULL DEFAULT 0,
+  errors INTEGER NOT NULL DEFAULT 0,
+  input_tokens INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  last_status INTEGER,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS rotation (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  cursor INTEGER NOT NULL DEFAULT 0
+);
+
+INSERT OR IGNORE INTO rotation (id, cursor) VALUES (1, 0);
