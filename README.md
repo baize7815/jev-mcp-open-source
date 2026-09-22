@@ -108,10 +108,6 @@ node scripts/verify.mjs http://127.0.0.1:8791
 
 使用自己的部署地址运行 `node scripts/verify.mjs https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev --live` 会额外执行少量真实推理并消耗自己的 TypeSafe 额度。不传 `--live` 时只验证工具列表、后台资源和输入校验。
 
-## 上传 GitHub
-
-仅提交源文件与配置模板。不要强制添加被 `.gitignore` 排除的真实配置、环境文件、运行缓存、数据库、依赖或日志。仓库不需要包含任何 Cloudflare OAuth token、部署地址或 API Key；每位使用者在自己的环境完成授权和配置。
-
 ---
 
 Copyright © 2026 baize7815。本项目原创代码与 Skill 采用 https://github.com/baize7815/jev-mcp-open-source/blob/main/LICENSE 许可证；依赖和参考项目见 https://github.com/baize7815/jev-mcp-open-source/blob/main/THIRD_PARTY_NOTICES.md 。
