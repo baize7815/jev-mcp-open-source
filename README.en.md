@@ -232,6 +232,8 @@ node scripts/verify.mjs https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev --live
 
 ## Security notes
 
+Run `npm run privacy:check` before publishing or pushing. It checks tracked files for private configuration, common credential formats and hardcoded MCP endpoints in scripts, reporting only filenames and categories. This heuristic does not guarantee detection of every secret or scan commit history. Revoke or rotate any previously exposed credential; deleting the current file does not undo exposure.
+
 - The repository ships source and config templates only. Real `wrangler.jsonc`, `.dev.vars`, `.env*`, `*.pem`, `*.key` and similar files are excluded by `.gitignore`.
 - `/mcp` is unauthenticated by default; anyone with the deployment URL can spend your TypeSafe quota. Add access control on the Cloudflare side if you do not want it public.
 - `ADMIN_TOKEN` and `KEY_ENCRYPTION_SECRET` are injected via Wrangler secrets — never commit them to source, config files, or command-line arguments.

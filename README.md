@@ -232,6 +232,8 @@ node scripts/verify.mjs https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev --live
 
 ## 安全提示
 
+发布或推送前运行 `npm run privacy:check`。检查覆盖 Git 跟踪文件中的私人配置、常见凭据格式和脚本内固定 MCP 地址，报错只显示文件名与类别，不输出密钥。它是启发式检查，不能保证发现所有秘密，也不会扫描历史提交；如凭据曾公开，应立即撤销或轮换，仅删除当前文件并不能消除泄露。
+
 - 仓库只包含源码与配置模板；真实的 `wrangler.jsonc`、`.dev.vars`、`.env*`、`*.pem`、`*.key` 等都被 `.gitignore` 排除。
 - `/mcp` 默认无鉴权，任何知道部署地址的人都能消耗你配置的 TypeSafe 额度；如果不希望公开，请在 Cloudflare 侧加访问控制。
 - `ADMIN_TOKEN` 与 `KEY_ENCRYPTION_SECRET` 通过 Wrangler Secret 注入，不要写进源码、配置文件或命令行参数。

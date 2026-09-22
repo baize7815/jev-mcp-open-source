@@ -1,6 +1,8 @@
 node_modules/
 .wrangler/
 .recovery/
+.wrangler-auth/
+scripts/recover.mjs
 dist/
 coverage/
 worker-configuration.d.ts

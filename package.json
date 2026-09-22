@@ -11,6 +11,7 @@
     "dev": "wrangler dev",
     "types": "wrangler types",
     "typecheck": "tsc --noEmit",
+    "privacy:check": "node scripts/check-privacy.mjs",
     "test": "node --experimental-strip-types --test test/*.test.ts test/*.test.mjs",
     "deploy:check": "wrangler deploy --dry-run",
     "predeploy": "node scripts/check-config.mjs",
